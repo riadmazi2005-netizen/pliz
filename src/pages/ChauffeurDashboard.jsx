@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../src/utils';
+import { createPageUrl } from '../utils';
 import { 
   chauffeursAPI, 
   busAPI, 
@@ -16,7 +16,7 @@ import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { 
   Bus, Bell, LogOut, Users, AlertCircle, DollarSign, 
-  Route, User, TrendingUp, CheckCircle, Calendar, MapPin
+  User, TrendingUp, CheckCircle, Calendar, MapPin
 } from 'lucide-react';
 import NotificationPanel from '../components/ui/NotificationPanel';
 import StatCard from '../components/ui/StatCard';
@@ -309,7 +309,7 @@ export default function ChauffeurDashboard() {
 
             <div className="bg-white rounded-3xl shadow-xl p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Route className="w-5 h-5 text-amber-500" />
+                <User className="w-5 h-5 text-amber-500" />
                 Mon Trajet
               </h2>
               {trajet ? (

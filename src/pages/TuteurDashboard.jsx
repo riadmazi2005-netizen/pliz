@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createPageUrl } from '../src/utils';
+import { createPageUrl } from '../utils';
 import { elevesAPI, notificationsAPI, presencesAPI } from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";

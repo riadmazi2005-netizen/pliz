@@ -5,7 +5,7 @@ import { elevesAPI, busAPI, chauffeursAPI, responsablesAPI, paiementsAPI, accide
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { 
-  Shield, Bell, LogOut, Bus, Users, UserCog, Route, 
+  Shield, Bell, LogOut, Bus, Users, UserCog, 
   CreditCard, AlertCircle, BarChart3, ClipboardList, FileText
 } from 'lucide-react';
 import NotificationPanel from '../components/ui/NotificationPanel';

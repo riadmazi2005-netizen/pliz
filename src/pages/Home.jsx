@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from '../src/utils';
+import { createPageUrl } from '../utils';
 import { Bus, Users, UserCog, Shield, GraduationCap } from 'lucide-react';
 import { motion } from 'framer-motion';
 

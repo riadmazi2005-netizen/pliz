@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../src/utils';
+import { createPageUrl } from "../utils";
 import { authAPI } from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Input } from "@/components/ui/input";

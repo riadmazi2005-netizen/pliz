@@ -1,29 +1,32 @@
 // src/services/apiService.js
-// Service centralisé pour tous les appels API vers le backend PHP
+// Service centralisé pour tous les appels API vers le backend PHP (Version Sessions PHP)
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'http://localhost/backend/api';
 
 /**
  * Fonction utilitaire pour gérer les requêtes HTTP
+ * Corrigée pour utiliser les sessions PHP au lieu du JWT
  */
 const fetchAPI = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('token');
-  
   const config = {
+    ...options,
+    // IMPORTANT : Permet d'envoyer et recevoir les cookies de session (PHPSESSID)
+    credentials: 'include', 
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     },
-    ...options,
   };
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+    
+    // On récupère le texte d'abord pour éviter les erreurs si le PHP renvoie du vide
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
 
     if (!response.ok) {
-      throw new Error(data.message || 'Erreur lors de la requête');
+      throw new Error(data.error || data.message || 'Erreur lors de la requête');
     }
 
     return data;
@@ -55,21 +58,22 @@ export const authAPI = {
   },
 
   // Déconnexion
-  logout: () => {
-    localStorage.removeItem('token');
+  logout: async () => {
     localStorage.removeItem('user');
+    // On appelle le backend pour détruire la session PHP
+    return fetchAPI('/auth/logout.php', { method: 'POST' });
   },
 
-  // Récupérer utilisateur connecté
+  // Récupérer utilisateur connecté (stocké localement pour l'UI)
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
 
-  // Sauvegarder utilisateur
-  saveUser: (user, token) => {
+  // Sauvegarder utilisateur (après login réussi)
+  saveUser: (user) => {
     localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
+    // Plus besoin de stocker le token ici
   }
 };
 

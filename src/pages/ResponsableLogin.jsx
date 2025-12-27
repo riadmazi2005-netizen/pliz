@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../src/utils';
+import { createPageUrl } from '../utils';
 import { authAPI } from '../services/apiService';
 import LoginForm from '../components/ui/LoginForm';
 import { UserCog } from 'lucide-react';

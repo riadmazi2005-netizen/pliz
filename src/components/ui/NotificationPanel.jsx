@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, CheckCircle, AlertCircle, Info, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { formatDate } from '@/lib/utils';
+import { formatDate } from "../../utils";
 
 export default function NotificationPanel({ 
   notifications = [], 
