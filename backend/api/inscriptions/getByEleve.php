@@ -1,5 +1,5 @@
 <?php
-// backend/api/inscriptions/getAll.php
+// backend/api/inscriptions/getByEleve.php
 require_once '../../config/database.php';
 
 // Configuration CORS
@@ -22,10 +22,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
+// Vérifier que l'ID de l'élève est fourni
+if (!isset($_GET['eleve_id']) || empty($_GET['eleve_id'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'L\'ID de l\'élève est requis']);
+    exit;
+}
+
+$eleve_id = $_GET['eleve_id'];
+
 try {
     $db = Database::getInstance()->getConnection();
 
-    // Récupération de toutes les inscriptions avec les informations liées
+    // Récupération des inscriptions de l'élève
     $stmt = $db->prepare("
         SELECT 
             i.id,
@@ -37,27 +46,19 @@ try {
             i.statut,
             i.montant_mensuel,
             i.date_creation,
-            e.nom as eleve_nom,
-            e.prenom as eleve_prenom,
-            e.classe as eleve_classe,
-            e.date_naissance as eleve_date_naissance,
-            e.tuteur_id,
-            u.nom as tuteur_nom,
-            u.prenom as tuteur_prenom,
-            u.email as tuteur_email,
-            u.telephone as tuteur_telephone,
             b.numero as bus_numero,
             b.marque as bus_marque,
             b.modele as bus_modele,
-            b.capacite as bus_capacite
+            b.immatriculation as bus_immatriculation,
+            b.capacite as bus_capacite,
+            b.statut as bus_statut
         FROM inscriptions i
-        INNER JOIN eleves e ON i.eleve_id = e.id
-        LEFT JOIN utilisateurs u ON e.tuteur_id = u.id
         LEFT JOIN bus b ON i.bus_id = b.id
+        WHERE i.eleve_id = ?
         ORDER BY i.date_creation DESC
     ");
     
-    $stmt->execute();
+    $stmt->execute([$eleve_id]);
     $inscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
@@ -67,11 +68,11 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log("Erreur récupération inscriptions DB: " . $e->getMessage());
+    error_log("Erreur récupération inscriptions élève DB: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Erreur lors de la récupération des inscriptions']);
 } catch (Exception $e) {
-    error_log("Erreur récupération inscriptions: " . $e->getMessage());
+    error_log("Erreur récupération inscriptions élève: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Erreur serveur']);
 }
