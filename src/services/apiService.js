@@ -1,0 +1,321 @@
+// src/services/apiService.js
+// Service centralisé pour tous les appels API vers le backend PHP
+
+const API_BASE_URL = 'http://localhost:8080/api';
+
+/**
+ * Fonction utilitaire pour gérer les requêtes HTTP
+ */
+const fetchAPI = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
+  
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Erreur lors de la requête');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+// ============================================
+// AUTHENTIFICATION
+// ============================================
+
+export const authAPI = {
+  // Connexion
+  login: async (email, password, role) => {
+    return fetchAPI('/auth/login.php', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, role }),
+    });
+  },
+
+  // Inscription tuteur
+  register: async (userData) => {
+    return fetchAPI('/auth/register.php', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  // Déconnexion
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
+
+  // Récupérer utilisateur connecté
+  getCurrentUser: () => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  },
+
+  // Sauvegarder utilisateur
+  saveUser: (user, token) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+  }
+};
+
+// ============================================
+// CHAUFFEURS
+// ============================================
+
+export const chauffeursAPI = {
+  getAll: () => fetchAPI('/chauffeurs/getAll.php'),
+  getById: (id) => fetchAPI(`/chauffeurs/getById.php?id=${id}`),
+  create: (data) => fetchAPI('/chauffeurs/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/chauffeurs/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/chauffeurs/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+  getAccidents: (id) => fetchAPI(`/chauffeurs/accidents.php?chauffeur_id=${id}`),
+};
+
+// ============================================
+// RESPONSABLES BUS
+// ============================================
+
+export const responsablesAPI = {
+  getAll: () => fetchAPI('/responsables/getAll.php'),
+  getById: (id) => fetchAPI(`/responsables/getById.php?id=${id}`),
+  create: (data) => fetchAPI('/responsables/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/responsables/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/responsables/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+};
+
+// ============================================
+// TUTEURS
+// ============================================
+
+export const tuteursAPI = {
+  getAll: () => fetchAPI('/tuteurs/getAll.php'),
+  getById: (id) => fetchAPI(`/tuteurs/getById.php?id=${id}`),
+  create: (data) => fetchAPI('/tuteurs/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/tuteurs/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  getEleves: (id) => fetchAPI(`/tuteurs/eleves.php?tuteur_id=${id}`),
+  getPaiements: (id) => fetchAPI(`/tuteurs/paiements.php?tuteur_id=${id}`),
+};
+
+// ============================================
+// ÉLÈVES
+// ============================================
+
+export const elevesAPI = {
+  getAll: () => fetchAPI('/eleves/getAll.php'),
+  getById: (id) => fetchAPI(`/eleves/getById.php?id=${id}`),
+  getByBus: (busId) => fetchAPI(`/eleves/getByBus.php?bus_id=${busId}`),
+  create: (data) => fetchAPI('/eleves/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/eleves/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/eleves/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+};
+
+// ============================================
+// BUS
+// ============================================
+
+export const busAPI = {
+  getAll: () => fetchAPI('/bus/getAll.php'),
+  getById: (id) => fetchAPI(`/bus/getById.php?id=${id}`),
+  create: (data) => fetchAPI('/bus/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/bus/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/bus/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+  getEleves: (id) => fetchAPI(`/bus/eleves.php?bus_id=${id}`),
+};
+
+// ============================================
+// TRAJETS
+// ============================================
+
+export const trajetsAPI = {
+  getAll: () => fetchAPI('/trajets/getAll.php'),
+  getById: (id) => fetchAPI(`/trajets/getById.php?id=${id}`),
+  create: (data) => fetchAPI('/trajets/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/trajets/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/trajets/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+};
+
+// ============================================
+// PRÉSENCES
+// ============================================
+
+export const presencesAPI = {
+  getByDate: (date) => fetchAPI(`/presences/getByDate.php?date=${date}`),
+  getByEleve: (eleveId, startDate, endDate) => 
+    fetchAPI(`/presences/getByEleve.php?eleve_id=${eleveId}&start_date=${startDate}&end_date=${endDate}`),
+  marquer: (data) => fetchAPI('/presences/marquer.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getStatistiques: (eleveId) => fetchAPI(`/presences/statistiques.php?eleve_id=${eleveId}`),
+};
+
+// ============================================
+// ACCIDENTS
+// ============================================
+
+export const accidentsAPI = {
+  getAll: () => fetchAPI('/accidents/getAll.php'),
+  getById: (id) => fetchAPI(`/accidents/getById.php?id=${id}`),
+  getByChauffeur: (chauffeurId) => fetchAPI(`/accidents/getByChauffeur.php?chauffeur_id=${chauffeurId}`),
+  create: (data) => fetchAPI('/accidents/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/accidents/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+  delete: (id) => fetchAPI('/accidents/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+};
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+export const notificationsAPI = {
+  getByUser: (userId, userType) => 
+    fetchAPI(`/notifications/getByUser.php?user_id=${userId}&user_type=${userType}`),
+  marquerLue: (id) => fetchAPI('/notifications/marquerLue.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id }),
+  }),
+  create: (data) => fetchAPI('/notifications/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  delete: (id) => fetchAPI('/notifications/delete.php', {
+    method: 'DELETE',
+    body: JSON.stringify({ id }),
+  }),
+};
+
+// ============================================
+// DEMANDES
+// ============================================
+
+export const demandesAPI = {
+  getAll: () => fetchAPI('/demandes/getAll.php'),
+  getByUser: (userId, userType) => 
+    fetchAPI(`/demandes/getByUser.php?user_id=${userId}&user_type=${userType}`),
+  create: (data) => fetchAPI('/demandes/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  traiter: (id, statut, commentaire) => fetchAPI('/demandes/traiter.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, statut, commentaire }),
+  }),
+};
+
+// ============================================
+// INSCRIPTIONS
+// ============================================
+
+export const inscriptionsAPI = {
+  getAll: () => fetchAPI('/inscriptions/getAll.php'),
+  getByEleve: (eleveId) => fetchAPI(`/inscriptions/getByEleve.php?eleve_id=${eleveId}`),
+  create: (data) => fetchAPI('/inscriptions/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => fetchAPI('/inscriptions/update.php', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...data }),
+  }),
+};
+
+// ============================================
+// PAIEMENTS
+// ============================================
+
+export const paiementsAPI = {
+  getAll: () => fetchAPI('/paiements/getAll.php'),
+  getByTuteur: (tuteurId) => fetchAPI(`/paiements/getByTuteur.php?tuteur_id=${tuteurId}`),
+  getByEleve: (eleveId) => fetchAPI(`/paiements/getByEleve.php?eleve_id=${eleveId}`),
+  create: (data) => fetchAPI('/paiements/create.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getImpaye: () => fetchAPI('/paiements/getImpaye.php'),
+};
+
+// ============================================
+// STATISTIQUES
+// ============================================
+
+export const statistiquesAPI = {
+  getDashboard: (role, userId) => 
+    fetchAPI(`/statistiques/dashboard.php?role=${role}&user_id=${userId}`),
+  getFinancieres: () => fetchAPI('/statistiques/financieres.php'),
+  getPresences: (startDate, endDate) => 
+    fetchAPI(`/statistiques/presences.php?start_date=${startDate}&end_date=${endDate}`),
+};
