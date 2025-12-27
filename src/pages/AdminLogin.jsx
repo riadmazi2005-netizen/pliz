@@ -10,6 +10,26 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Fonction pour filtrer les messages d'erreur comme pour les autres rôles
+  const getErrorMessage = (err, response) => {
+    // Si c'est une erreur 401 (identifiants faux)
+    if (err?.response?.status === 401 || response?.status === 401) {
+      return 'Email ou mot de passe incorrect.';
+    }
+
+    const message = (response?.message || err?.message || '').toLowerCase();
+    
+    if (message.includes('credentials') || message.includes('invalid') || message.includes('incorrect')) {
+      return 'Email ou mot de passe incorrect.';
+    }
+    
+    if (message.includes('network') || message.includes('fetch') || message.includes('connexion au serveur')) {
+      return 'Impossible de joindre le serveur. Vérifiez votre connexion.';
+    }
+    
+    return 'Email ou mot de passe incorrect.';
+  };
+
   const handleLogin = async (formData) => {
     setLoading(true);
     setError('');
@@ -18,17 +38,15 @@ export default function AdminLogin() {
       const response = await authAPI.login(formData.email, formData.password, 'admin');
       
       if (response.success) {
-        // Sauvegarder les informations de l'admin
-        authAPI.saveUser(response.user, response.token);
+        authAPI.saveUser(response.user);
         localStorage.setItem('admin_session', JSON.stringify(response.user));
-        
         navigate(createPageUrl('AdminDashboard'));
       } else {
-        setError(response.message || 'Email ou mot de passe incorrect');
+        setError(getErrorMessage(null, response));
       }
     } catch (err) {
       console.error('Erreur de connexion:', err);
-      setError('Erreur de connexion au serveur');
+      setError(getErrorMessage(err, null));
     } finally {
       setLoading(false);
     }

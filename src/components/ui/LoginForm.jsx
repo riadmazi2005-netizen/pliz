@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom'; // Ajoutez ceci
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, ArrowLeft } from 'lucide-react'; // Ajoutez ArrowLeft
 
 export default function LoginForm({ 
   title, 
@@ -20,6 +21,7 @@ export default function LoginForm({
 }) {
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate(); // Initialisez le hook
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -38,7 +40,19 @@ export default function LoginForm({
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <div className="bg-white rounded-3xl shadow-2xl p-8 border border-amber-100">
+        {/* Conteneur principal de la carte avec 'relative' pour le positionnement du bouton */}
+        <div className="relative bg-white rounded-3xl shadow-2xl p-8 border border-amber-100">
+          
+          {/* Bouton Retour en haut à gauche à l'intérieur */}
+          <button 
+            type="button"
+            onClick={() => navigate('/')} 
+            className="absolute top-6 left-6 p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all duration-200"
+            title="Retour"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Icon className="w-10 h-10 text-white" />
@@ -47,6 +61,7 @@ export default function LoginForm({
             <p className="text-gray-500 mt-2">Connectez-vous pour accéder</p>
           </div>
 
+          {/* ... reste du code (error, form, etc.) ... */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm text-center">
               {error}
@@ -54,6 +69,7 @@ export default function LoginForm({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* ... champs de formulaire ... */}
             {loginFields.map((field) => (
               <div key={field.name}>
                 <Label className="text-gray-700 font-medium">{field.label}</Label>

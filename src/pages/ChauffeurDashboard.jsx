@@ -14,9 +14,9 @@ import {
 } from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { 
-  Bus, Bell, LogOut, Users, AlertCircle, DollarSign, 
-  Route, User, TrendingUp, CheckCircle, Calendar, MapPin
+import {
+  Bus, Bell, LogOut, Users, AlertCircle, DollarSign,
+  Navigation, User, TrendingUp, CheckCircle, Calendar, MapPin
 } from 'lucide-react';
 import NotificationPanel from '../components/ui/NotificationPanel';
 import StatCard from '../components/ui/StatCard';
@@ -309,7 +309,7 @@ export default function ChauffeurDashboard() {
 
             <div className="bg-white rounded-3xl shadow-xl p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Route className="w-5 h-5 text-amber-500" />
+                <Navigation className="w-5 h-5 text-amber-500" />
                 Mon Trajet
               </h2>
               {trajet ? (

@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { elevesAPI, busAPI, chauffeursAPI, responsablesAPI, paiementsAPI, accidentsAPI, demandesAPI, notificationsAPI } from '../services/apiService';
+import { 
+  elevesAPI, 
+  busAPI, 
+  chauffeursAPI, 
+  responsablesAPI, 
+  paiementsAPI, 
+  accidentsAPI, 
+  demandesAPI, 
+  notificationsAPI,
+  inscriptionsAPI 
+} from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { 
-  Shield, Bell, LogOut, Bus, Users, UserCog, Route, 
+import {
+  Shield, Bell, LogOut, Bus, Users, UserCog,
   CreditCard, AlertCircle, BarChart3, ClipboardList, FileText
 } from 'lucide-react';
 import NotificationPanel from '../components/ui/NotificationPanel';
@@ -20,6 +30,7 @@ export default function AdminDashboard() {
     chauffeurs: 0,
     responsables: 0,
     inscriptionsEnAttente: 0,
+    inscriptionsActives: 0,
     paiementsEnAttente: 0,
     accidents: 0,
     demandes: 0
@@ -27,6 +38,7 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const session = localStorage.getItem('admin_session');
@@ -41,8 +53,12 @@ export default function AdminDashboard() {
   }, [navigate]);
 
   const loadData = async (adminId) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      const [eleves, buses, chauffeurs, responsables, paiements, accidents, demandes, notifs] = await Promise.all([
+      // Charger toutes les données en parallèle
+      const results = await Promise.allSettled([
         elevesAPI.getAll(),
         busAPI.getAll(),
         chauffeursAPI.getAll(),
@@ -50,15 +66,53 @@ export default function AdminDashboard() {
         paiementsAPI.getAll(),
         accidentsAPI.getAll(),
         demandesAPI.getAll(),
+        inscriptionsAPI.getAll(),
         notificationsAPI.getByUser(adminId, 'admin')
       ]);
+
+      // Extraire les données avec gestion des erreurs
+      const [
+        elevesRes,
+        busesRes,
+        chauffeursRes,
+        responsablesRes,
+        paiementsRes,
+        accidentsRes,
+        demandesRes,
+        inscriptionsRes,
+        notifsRes
+      ] = results;
+
+      // Gérer les données avec fallback
+      const eleves = (elevesRes.status === 'fulfilled' ? elevesRes.value?.data || elevesRes.value : []) || [];
+      const buses = (busesRes.status === 'fulfilled' ? busesRes.value?.data || busesRes.value : []) || [];
+      const chauffeurs = (chauffeursRes.status === 'fulfilled' ? chauffeursRes.value?.data || chauffeursRes.value : []) || [];
+      const responsables = (responsablesRes.status === 'fulfilled' ? responsablesRes.value?.data || responsablesRes.value : []) || [];
+      const paiements = (paiementsRes.status === 'fulfilled' ? paiementsRes.value?.data || paiementsRes.value : []) || [];
+      const accidents = (accidentsRes.status === 'fulfilled' ? accidentsRes.value?.data || accidentsRes.value : []) || [];
+      const demandes = (demandesRes.status === 'fulfilled' ? demandesRes.value?.data || demandesRes.value : []) || [];
+      const inscriptions = (inscriptionsRes.status === 'fulfilled' ? inscriptionsRes.value?.data || inscriptionsRes.value : []) || [];
+      const notifs = (notifsRes.status === 'fulfilled' ? notifsRes.value?.data || notifsRes.value : []) || [];
+
+      // Calculer les inscriptions en attente
+      // Ce sont les élèves qui n'ont pas encore d'inscription active
+      const elevesAvecInscription = new Set(
+        inscriptions
+          .filter(i => i.statut === 'Active' || i.statut === 'Suspendue')
+          .map(i => i.eleve_id)
+      );
+      
+      const inscriptionsEnAttente = eleves.filter(e => 
+        e.statut === 'Inactif' || !elevesAvecInscription.has(e.id)
+      ).length;
 
       setStats({
         eleves: eleves.length,
         bus: buses.length,
         chauffeurs: chauffeurs.length,
         responsables: responsables.length,
-        inscriptionsEnAttente: eleves.filter(e => e.statut === 'Inactif').length,
+        inscriptionsEnAttente: inscriptionsEnAttente,
+        inscriptionsActives: inscriptions.filter(i => i.statut === 'Active').length,
         paiementsEnAttente: paiements.filter(p => p.statut === 'En attente').length,
         accidents: accidents.length,
         demandes: demandes.filter(d => d.statut === 'En attente').length
@@ -67,12 +121,16 @@ export default function AdminDashboard() {
       setNotifications(notifs.sort((a, b) => new Date(b.date) - new Date(a.date)));
     } catch (err) {
       console.error('Erreur lors du chargement des données:', err);
+      setError('Erreur lors du chargement des données');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('admin_session');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate(createPageUrl('Home'));
   };
 
@@ -94,28 +152,32 @@ export default function AdminDashboard() {
       link: 'AdminInscriptions',
       description: 'Gérer les demandes d\'inscription',
       badge: stats.inscriptionsEnAttente,
-      color: 'from-blue-400 to-cyan-500'
+      color: 'from-blue-400 to-cyan-500',
+      stat: `${stats.inscriptionsActives} actives`
     },
     { 
       title: 'Bus & Trajets', 
       icon: Bus, 
       link: 'AdminBus',
       description: 'Gérer les bus et trajets',
-      color: 'from-amber-400 to-yellow-500'
+      color: 'from-amber-400 to-yellow-500',
+      stat: `${stats.bus} bus`
     },
     { 
       title: 'Chauffeurs', 
       icon: Users, 
       link: 'AdminChauffeurs',
       description: 'Gérer les chauffeurs',
-      color: 'from-green-400 to-emerald-500'
+      color: 'from-green-400 to-emerald-500',
+      stat: `${stats.chauffeurs} actifs`
     },
     { 
       title: 'Responsables', 
       icon: UserCog, 
       link: 'AdminResponsables',
       description: 'Gérer les responsables bus',
-      color: 'from-purple-400 to-violet-500'
+      color: 'from-purple-400 to-violet-500',
+      stat: `${stats.responsables} actifs`
     },
     { 
       title: 'Demandes', 
@@ -123,14 +185,16 @@ export default function AdminDashboard() {
       link: 'AdminDemandes',
       description: 'Traiter les demandes',
       badge: stats.demandes,
-      color: 'from-orange-400 to-red-500'
+      color: 'from-orange-400 to-red-500',
+      stat: `${stats.demandes} en attente`
     },
     { 
       title: 'Accidents', 
       icon: AlertCircle, 
       link: 'AdminAccidents',
       description: 'Consulter les accidents',
-      color: 'from-red-400 to-rose-500'
+      color: 'from-red-400 to-rose-500',
+      stat: `${stats.accidents} signalés`
     },
     { 
       title: 'Statistiques', 
@@ -144,7 +208,9 @@ export default function AdminDashboard() {
       icon: CreditCard, 
       link: 'AdminPaiements',
       description: 'Suivi des paiements',
-      color: 'from-teal-400 to-cyan-500'
+      color: 'from-teal-400 to-cyan-500',
+      badge: stats.paiementsEnAttente,
+      stat: `${stats.paiementsEnAttente} en attente`
     }
   ];
 
@@ -174,7 +240,7 @@ export default function AdminDashboard() {
                 <h1 className="text-2xl font-bold text-gray-800">
                   Administration
                 </h1>
-                <p className="text-gray-500">{admin?.email}</p>
+                <p className="text-gray-500">{admin?.email || admin?.nom}</p>
               </div>
             </div>
             
@@ -203,6 +269,17 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700"
+          >
+            {error}
+          </motion.div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
           <StatCard 
@@ -210,6 +287,7 @@ export default function AdminDashboard() {
             value={stats.eleves} 
             icon={Users} 
             color="blue"
+            subtitle={`${stats.inscriptionsActives} inscrits`}
           />
           <StatCard 
             title="Bus" 
@@ -249,20 +327,52 @@ export default function AdminDashboard() {
                       <item.icon className="w-7 h-7 text-white" />
                     </div>
                     
-                    {item.badge > 0 && (
+                    {item.badge !== undefined && item.badge > 0 && (
                       <span className="absolute top-0 right-0 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                         {item.badge}
                       </span>
                     )}
                     
                     <h3 className="text-lg font-bold text-gray-800 mb-1">{item.title}</h3>
-                    <p className="text-sm text-gray-500">{item.description}</p>
+                    <p className="text-sm text-gray-500 mb-2">{item.description}</p>
+                    
+                    {item.stat && (
+                      <p className="text-xs font-semibold text-gray-600">{item.stat}</p>
+                    )}
                   </div>
                 </div>
               </Link>
             </motion.div>
           ))}
         </div>
+
+        {/* Quick Stats Summary */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mt-8 bg-white rounded-3xl shadow-xl p-6"
+        >
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Résumé rapide</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded-2xl">
+              <p className="text-sm text-gray-600 mb-1">Inscriptions en attente</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.inscriptionsEnAttente}</p>
+            </div>
+            <div className="text-center p-4 bg-amber-50 rounded-2xl">
+              <p className="text-sm text-gray-600 mb-1">Inscriptions actives</p>
+              <p className="text-3xl font-bold text-amber-600">{stats.inscriptionsActives}</p>
+            </div>
+            <div className="text-center p-4 bg-red-50 rounded-2xl">
+              <p className="text-sm text-gray-600 mb-1">Accidents totaux</p>
+              <p className="text-3xl font-bold text-red-600">{stats.accidents}</p>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-2xl">
+              <p className="text-sm text-gray-600 mb-1">Paiements en attente</p>
+              <p className="text-3xl font-bold text-green-600">{stats.paiementsEnAttente}</p>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       <NotificationPanel
@@ -270,6 +380,14 @@ export default function AdminDashboard() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAsRead={markNotificationAsRead}
+        onDelete={async (notifId) => {
+          try {
+            await notificationsAPI.delete(notifId);
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+          } catch (err) {
+            console.error('Erreur lors de la suppression de la notification:', err);
+          }
+        }}
       />
     </div>
   );

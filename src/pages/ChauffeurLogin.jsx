@@ -15,26 +15,27 @@ export default function ChauffeurLogin() {
     setError('');
     
     try {
-      // Appel à l'API d'authentification
       const response = await authAPI.login(formData.email, formData.password, 'chauffeur');
       
       if (response.success) {
-        // Sauvegarder la session du chauffeur
         localStorage.setItem('chauffeur_session', JSON.stringify(response.user));
-        
-        // Sauvegarder le token si fourni
-        if (response.token) {
-          authAPI.saveUser(response.user, response.token);
-        }
-        
-        // Rediriger vers le dashboard
+        authAPI.saveUser(response.user);
         navigate(createPageUrl('ChauffeurDashboard'));
       } else {
-        setError(response.message || 'Erreur de connexion');
+        // Si le serveur répond mais avec success: false
+        setError(response.message || 'Email ou mot de passe incorrect.');
       }
     } catch (err) {
       console.error('Erreur de connexion:', err);
-      setError(err.message || 'Erreur de connexion au serveur');
+      
+      // On vérifie si c'est une erreur d'authentification (401) 
+      // ou si on veut simplement afficher un message fixe pour la sécurité
+      if (err.response && err.response.status === 401) {
+        setError('Email ou mot de passe incorrect.');
+      } else {
+        // Optionnel : différencier l'erreur d'identifiants d'une erreur réseau
+        setError('Email ou mot de passe incorrect.'); 
+      }
     } finally {
       setLoading(false);
     }

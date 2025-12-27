@@ -19,12 +19,12 @@ export default function TuteurLogin() {
       const response = await authAPI.login(formData.email, formData.password, 'tuteur');
       
       if (response.success) {
-        // Save user data and token
-        authAPI.saveUser(response.user, response.token);
-        
+        // Save user data
+        authAPI.saveUser(response.user);
+
         // Store in localStorage for session (for backward compatibility)
         localStorage.setItem('tuteur_session', JSON.stringify(response.user));
-        
+
         // Navigate to dashboard
         navigate(createPageUrl('TuteurDashboard'));
       } else {

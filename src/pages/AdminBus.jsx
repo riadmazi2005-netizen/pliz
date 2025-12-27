@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Bus, ArrowLeft, Plus, Edit, Trash2, Route, MapPin, Save, X
+import {
+  Bus, ArrowLeft, Plus, Edit, Trash2, Navigation, MapPin, Save, X
 } from 'lucide-react';
 
 export default function AdminBus() {

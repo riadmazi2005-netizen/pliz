@@ -1,7 +1,7 @@
 // src/services/apiService.js
 // Service centralisé pour tous les appels API vers le backend PHP
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'http://localhost/backend/api';
 
 /**
  * Fonction utilitaire pour gérer les requêtes HTTP
@@ -15,6 +15,7 @@ const fetchAPI = async (endpoint, options = {}) => {
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     },
+    credentials: 'include',
     ...options,
   };
 
@@ -67,9 +68,8 @@ export const authAPI = {
   },
 
   // Sauvegarder utilisateur
-  saveUser: (user, token) => {
+  saveUser: (user) => {
     localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
   }
 };
 
