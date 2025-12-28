@@ -6,6 +6,7 @@ const Button = React.forwardRef(({
   variant = 'default', 
   size = 'default', 
   disabled = false,
+  type = 'button',
   children, 
   ...props 
 }, ref) => {
@@ -30,6 +31,7 @@ const Button = React.forwardRef(({
   return (
     <motion.button
       ref={ref}
+      type={type}
       whileHover={!disabled ? { scale: 1.02 } : {}}
       whileTap={!disabled ? { scale: 0.98 } : {}}
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}

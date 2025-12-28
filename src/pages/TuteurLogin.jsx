@@ -19,6 +19,11 @@ export default function TuteurLogin() {
       const response = await authAPI.login(formData.email, formData.password, 'tuteur');
       
       if (response.success) {
+        // Save JWT token for API authentication
+        if (response.token) {
+          localStorage.setItem('token', response.token);
+        }
+        
         // Save user data
         authAPI.saveUser(response.user);
 

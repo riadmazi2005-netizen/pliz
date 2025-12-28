@@ -58,7 +58,7 @@ export default function ResponsableLogin() { // <-- Ne pas oublier l'export et l
 
   return (
     <LoginForm
-      title="Espace Responsable"
+      title="Espace Responsable Bus"
       icon={Bus}
       onLogin={handleLogin}
       showRegister={false}

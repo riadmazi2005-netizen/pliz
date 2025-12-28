@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { demandesAPI, chauffeursAPI, responsablesAPI, notificationsAPI } from '../services/apiService';
+import { demandesAPI, chauffeursAPI, responsablesAPI, notificationsAPI, elevesAPI } from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,8 +35,9 @@ export default function AdminDemandes() {
     setLoading(true);
     setError(null);
     try {
-      const data = await demandesAPI.getAll();
-      setDemandes(data.sort((a, b) => new Date(b.date_demande) - new Date(a.date_demande)));
+      const response = await demandesAPI.getAll();
+      const data = response?.data || response || [];
+      setDemandes(data.sort((a, b) => new Date(b.date_creation || b.date_demande || 0) - new Date(a.date_creation || a.date_demande || 0)));
     } catch (err) {
       console.error('Erreur lors du chargement:', err);
       setError('Erreur lors du chargement des demandes');
@@ -64,6 +65,19 @@ export default function AdminDemandes() {
           await responsablesAPI.update(selectedDemande.demandeur_id, {
             salaire: parseInt(nouveauSalaire)
           });
+        }
+      }
+      
+      // Si déménagement, mettre à jour l'adresse et la zone de l'élève
+      if (selectedDemande.type_demande === 'Déménagement' && selectedDemande.eleve_id) {
+        const updateData = {};
+        if (selectedDemande.nouvelle_adresse) {
+          updateData.adresse = selectedDemande.nouvelle_adresse;
+        }
+        // Note: La zone n'est pas dans la table eleves directement, elle est probablement dans inscriptions
+        // Vous devrez peut-être ajuster cela selon votre structure
+        if (updateData.adresse) {
+          await elevesAPI.update(selectedDemande.eleve_id, updateData);
         }
       }
       
@@ -133,6 +147,7 @@ export default function AdminDemandes() {
     const styles = {
       'Augmentation': 'bg-purple-100 text-purple-700',
       'Congé': 'bg-blue-100 text-blue-700',
+      'Déménagement': 'bg-amber-100 text-amber-700',
       'Autre': 'bg-gray-100 text-gray-700'
     };
     return styles[type] || 'bg-gray-100 text-gray-700';
@@ -205,16 +220,18 @@ export default function AdminDemandes() {
                         </span>
                       </div>
 
-                      {demande.type_demande === 'Augmentation' && (
+                      {demande.type_demande === 'Augmentation' && demande.salaire_actuel && (
                         <div className="flex gap-4 text-sm mb-2">
                           <div>
                             <span className="text-gray-500">Salaire actuel:</span>
                             <span className="ml-2 font-semibold">{demande.salaire_actuel} DH</span>
                           </div>
-                          <div>
-                            <span className="text-gray-500">Salaire demandé:</span>
-                            <span className="ml-2 font-semibold text-purple-600">{demande.salaire_demande} DH</span>
-                          </div>
+                          {demande.salaire_demande && (
+                            <div>
+                              <span className="text-gray-500">Salaire demandé:</span>
+                              <span className="ml-2 font-semibold text-purple-600">{demande.salaire_demande} DH</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -225,9 +242,48 @@ export default function AdminDemandes() {
                         </div>
                       )}
 
-                      <p className="text-gray-600 text-sm bg-gray-50 rounded-xl p-3 mt-2">
-                        <strong>Justification:</strong> {demande.raisons}
-                      </p>
+                      {demande.type_demande === 'Déménagement' && (
+                        <div className="bg-amber-50 rounded-xl p-4 text-sm mb-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {demande.eleve_adresse && (
+                              <div>
+                                <span className="text-gray-600">Adresse actuelle:</span>
+                                <p className="font-medium">{demande.eleve_adresse}</p>
+                              </div>
+                            )}
+                            {demande.nouvelle_adresse && (
+                              <div>
+                                <span className="text-gray-600">Nouvelle adresse:</span>
+                                <p className="font-medium text-amber-700">{demande.nouvelle_adresse}</p>
+                              </div>
+                            )}
+                            {demande.nouvelle_zone && (
+                              <div>
+                                <span className="text-gray-600">Nouvelle zone:</span>
+                                <p className="font-medium text-amber-700">{demande.nouvelle_zone}</p>
+                              </div>
+                            )}
+                            {demande.date_demenagement && (
+                              <div>
+                                <span className="text-gray-600">Date de déménagement:</span>
+                                <p className="font-medium">{demande.date_demenagement}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {demande.raisons && (
+                        <p className="text-gray-600 text-sm bg-gray-50 rounded-xl p-3 mt-2">
+                          <strong>Justification:</strong> {demande.raisons}
+                        </p>
+                      )}
+
+                      {demande.description && !demande.raisons && (
+                        <p className="text-gray-600 text-sm bg-gray-50 rounded-xl p-3 mt-2">
+                          <strong>Description:</strong> {typeof demande.description === 'string' ? demande.description : JSON.stringify(demande.description)}
+                        </p>
+                      )}
 
                       {demande.commentaire && (
                         <p className={`text-sm rounded-xl p-3 mt-2 ${
@@ -238,7 +294,7 @@ export default function AdminDemandes() {
                       )}
 
                       <p className="text-xs text-gray-400 mt-2">
-                        {demande.date_demande && format(new Date(demande.date_demande), 'dd MMMM yyyy à HH:mm', { locale: fr })}
+                        {format(new Date(demande.date_creation || demande.date_demande || Date.now()), 'dd MMMM yyyy à HH:mm', { locale: fr })}
                       </p>
                     </div>
 
@@ -300,6 +356,39 @@ export default function AdminDemandes() {
                       placeholder="Saisir le nouveau salaire"
                     />
                   </div>
+                </div>
+              )}
+
+              {selectedDemande.type_demande === 'Déménagement' && (
+                <div className="bg-amber-50 rounded-xl p-4">
+                  <div className="mb-3">
+                    <span className="text-gray-600 text-sm">Élève concerné:</span>
+                    <p className="font-medium">{selectedDemande.eleve_prenom} {selectedDemande.eleve_nom}</p>
+                  </div>
+                  {selectedDemande.eleve_adresse && (
+                    <div className="mb-3">
+                      <span className="text-gray-600 text-sm">Adresse actuelle:</span>
+                      <p className="font-medium">{selectedDemande.eleve_adresse}</p>
+                    </div>
+                  )}
+                  {selectedDemande.nouvelle_adresse && (
+                    <div className="mb-3">
+                      <span className="text-gray-600 text-sm">Nouvelle adresse:</span>
+                      <p className="font-medium text-amber-700">{selectedDemande.nouvelle_adresse}</p>
+                    </div>
+                  )}
+                  {selectedDemande.nouvelle_zone && (
+                    <div className="mb-3">
+                      <span className="text-gray-600 text-sm">Nouvelle zone:</span>
+                      <p className="font-medium text-amber-700">{selectedDemande.nouvelle_zone}</p>
+                    </div>
+                  )}
+                  {selectedDemande.date_demenagement && (
+                    <div>
+                      <span className="text-gray-600 text-sm">Date de déménagement:</span>
+                      <p className="font-medium">{selectedDemande.date_demenagement}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

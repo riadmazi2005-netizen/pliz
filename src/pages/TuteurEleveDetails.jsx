@@ -36,23 +36,27 @@ export default function TuteurEleveDetails() {
   const loadData = async (eleveId) => {
     try {
       // Charger l'élève
-      const eleveData = await elevesAPI.getById(eleveId);
+      const eleveResponse = await elevesAPI.getById(eleveId);
+      const eleveData = eleveResponse?.data || eleveResponse;
       setEleve(eleveData);
       
       // Charger le bus via les inscriptions
       if (eleveData) {
         // Récupérer toutes les inscriptions pour trouver le bus_id
         const inscriptionsAPI = await import('../services/apiService').then(m => m.inscriptionsAPI);
-        const allInscriptions = await inscriptionsAPI.getAll();
+        const allInscriptionsRes = await inscriptionsAPI.getAll();
+        const allInscriptions = allInscriptionsRes?.data || allInscriptionsRes || [];
         const eleveInscription = allInscriptions.find(i => i.eleve_id === parseInt(eleveId) && i.statut === 'Active');
         
         if (eleveInscription && eleveInscription.bus_id) {
-          const busData = await busAPI.getById(eleveInscription.bus_id);
+          const busResponse = await busAPI.getById(eleveInscription.bus_id);
+          const busData = busResponse?.data || busResponse;
           setBus(busData);
           
           // Charger le trajet
           if (busData && busData.trajet_id) {
-            const trajetData = await trajetsAPI.getById(busData.trajet_id);
+            const trajetResponse = await trajetsAPI.getById(busData.trajet_id);
+            const trajetData = trajetResponse?.data || trajetResponse;
             setTrajet(trajetData);
           }
         }
@@ -63,8 +67,9 @@ export default function TuteurEleveDetails() {
           const endDate = new Date().toISOString().split('T')[0];
           const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
           
-          const presencesData = await presencesAPI.getByEleve(eleveId, startDate, endDate);
-          setPresences(presencesData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+          const presencesResponse = await presencesAPI.getByEleve(eleveId, startDate, endDate);
+          const presencesData = presencesResponse?.data || presencesResponse || [];
+          setPresences(presencesData.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
         } catch (err) {
           console.warn('Présences non disponibles:', err);
           setPresences([]);
@@ -164,21 +169,9 @@ export default function TuteurEleveDetails() {
                   </div>
                 )}
                 {eleve.adresse && (
-                  <div className="flex justify-between py-2 border-b border-gray-100">
+                  <div className="flex justify-between py-2">
                     <span className="text-gray-500">Adresse</span>
                     <span className="font-medium text-right max-w-[200px]">{eleve.adresse}</span>
-                  </div>
-                )}
-                {eleve.telephone_parent && (
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-500">Téléphone</span>
-                    <span className="font-medium">{eleve.telephone_parent}</span>
-                  </div>
-                )}
-                {eleve.email_parent && (
-                  <div className="flex justify-between py-2">
-                    <span className="text-gray-500">Email</span>
-                    <span className="font-medium text-sm">{eleve.email_parent}</span>
                   </div>
                 )}
               </div>

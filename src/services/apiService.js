@@ -1,6 +1,8 @@
 // src/services/apiService.js
 // Service centralisé pour tous les appels API vers le backend PHP
 
+// URL du backend - Configuration pour XAMPP
+// Le dossier backend doit être placé dans C:\xampp\htdocs\backend
 const API_BASE_URL = 'http://localhost/backend/api';
 
 /**
@@ -10,27 +12,64 @@ const fetchAPI = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
   
   const config = {
+    method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     },
-    credentials: 'include',
+    ...(options.body && { body: options.body }),
     ...options,
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Erreur lors de la requête');
+    const url = `${API_BASE_URL}${endpoint}`;
+    console.log(`[API] ${options.method || 'GET'} ${url}`);
+    
+    const response = await fetch(url, config);
+    
+    // Try to parse JSON response
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('[API] Error parsing JSON:', jsonError);
+        const text = await response.text();
+        console.error('[API] Response text:', text);
+        throw new Error('Réponse invalide du serveur. Le backend ne renvoie pas du JSON valide.');
+      }
+    } else {
+      const text = await response.text();
+      console.error('[API] Non-JSON response:', text);
+      throw new Error(text || 'Erreur lors de la requête');
     }
 
+    if (!response.ok) {
+      console.error(`[API] Error ${response.status}:`, data);
+      throw new Error(data.message || `Erreur ${response.status}: Erreur lors de la requête`);
+    }
+
+    console.log('[API] Success:', data);
     return data;
   } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+    // Gestion spécifique des erreurs réseau
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      console.error('[API] Network Error:', error);
+      throw new Error(`Impossible de se connecter au serveur. Vérifiez que:
+1. XAMPP Apache est démarré
+2. Le backend est dans C:\\xampp\\htdocs\\backend
+3. L'URL ${API_BASE_URL} est accessible dans votre navigateur`);
+    }
+    
+    // If it's already an Error with a message, rethrow it
+    if (error instanceof Error) {
+      console.error('[API] Error:', error);
+      throw error;
+    }
+    console.error('[API] Unknown Error:', error);
+    throw new Error('Erreur de connexion au serveur');
   }
 };
 
@@ -56,9 +95,17 @@ export const authAPI = {
   },
 
   // Déconnexion
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  logout: async () => {
+    try {
+      await fetchAPI('/auth/logout.php', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
   },
 
   // Récupérer utilisateur connecté

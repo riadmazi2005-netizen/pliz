@@ -49,25 +49,33 @@ export default function TuteurProfile() {
     setError('');
     
     try {
-      // Update tuteur via API
-      await tuteursAPI.update(tuteurId, formData);
+      // Prepare data for update (exclude adresse as it's not in the database)
+      const { adresse, ...updateData } = formData;
       
-      // Update local session
+      // Update tuteur via API
+      const response = await tuteursAPI.update(tuteurId, updateData);
+      
+      // Update local session with the response data or form data
       const session = JSON.parse(localStorage.getItem('tuteur_session'));
-      const updatedSession = { ...session, ...formData };
+      const updatedSession = { 
+        ...session, 
+        ...updateData,
+        // Keep adresse in local storage if it was there, but don't send it to API
+        ...(adresse ? { adresse } : {})
+      };
       localStorage.setItem('tuteur_session', JSON.stringify(updatedSession));
       
       // Also update the 'user' in localStorage if using authAPI
       const user = authAPI.getCurrentUser();
       if (user) {
-        authAPI.saveUser({ ...user, ...formData }, localStorage.getItem('token'));
+        authAPI.saveUser({ ...user, ...updateData }, localStorage.getItem('token'));
       }
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error('Erreur lors de la mise à jour:', err);
-      setError('Erreur lors de la mise à jour du profil. Veuillez réessayer.');
+      setError(err.message || 'Erreur lors de la mise à jour du profil. Veuillez réessayer.');
     }
     setLoading(false);
   };

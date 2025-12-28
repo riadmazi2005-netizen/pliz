@@ -1,83 +1,69 @@
 <?php
+require_once '../../config/headers.php';
 require_once '../../config/database.php';
-
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
     exit;
 }
 
 $data = json_decode(file_get_contents('php://input'), true);
 
-$required_fields = ['destinataire_id', 'destinataire_type', 'titre', 'message'];
-foreach ($required_fields as $field) {
-    if (!isset($data[$field]) || empty(trim($data[$field]))) {
-        http_response_code(400);
-        echo json_encode(['error' => "Field '$field' is required"]);
-        exit;
-    }
-}
-
 try {
-    $db = Database::getInstance()->getConnection();
-
-    // Validate destinataire exists
-    $table = '';
-    if ($data['destinataire_type'] === 'tuteur') {
-        $table = 'utilisateurs';
-    } elseif ($data['destinataire_type'] === 'chauffeur') {
-        $table = 'chauffeurs';
-    } elseif ($data['destinataire_type'] === 'responsable') {
-        $table = 'responsables_bus';
-    } elseif ($data['destinataire_type'] === 'admin') {
-        $table = 'utilisateurs';
-    } else {
+    $pdo = getDBConnection();
+    
+    // Validate required fields
+    if (!isset($data['destinataire_id'])) {
         http_response_code(400);
-        echo json_encode(['error' => 'Invalid destinataire type']);
+        echo json_encode(['success' => false, 'message' => 'destinataire_id est requis']);
         exit;
     }
-
-    $stmt = $db->prepare("SELECT id FROM $table WHERE id = ?");
-    $stmt->execute([$data['destinataire_id']]);
-    if (!$stmt->fetch()) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Destinataire not found']);
+    
+    if (!isset($data['destinataire_type'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'destinataire_type est requis']);
         exit;
     }
-
-    // Create notification
-    $stmt = $db->prepare("
-        INSERT INTO notifications (destinataire_id, destinataire_type, titre, message, statut, date_creation)
-        VALUES (?, ?, ?, ?, 'Non lue', NOW())
-    ");
+    
+    if (!isset($data['titre'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'titre est requis']);
+        exit;
+    }
+    
+    if (!isset($data['message'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'message est requis']);
+        exit;
+    }
+    
+    $stmt = $pdo->prepare('
+        INSERT INTO notifications (destinataire_id, destinataire_type, titre, message, type, lue)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ');
+    
     $stmt->execute([
         $data['destinataire_id'],
         $data['destinataire_type'],
-        trim($data['titre']),
-        trim($data['message'])
+        $data['titre'],
+        $data['message'],
+        $data['type'] ?? 'info',
+        false
     ]);
-
+    
+    $id = $pdo->lastInsertId();
+    $stmt = $pdo->prepare('SELECT * FROM notifications WHERE id = ?');
+    $stmt->execute([$id]);
+    $notification = $stmt->fetch(PDO::FETCH_ASSOC);
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Notification created successfully',
-        'data' => [
-            'id' => $db->lastInsertId(),
-            'destinataire_id' => $data['destinataire_id'],
-            'destinataire_type' => $data['destinataire_type']
-        ]
+        'data' => $notification
     ]);
-
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erreur lors de la création de la notification: ' . $e->getMessage()]);
 }
 ?>
+

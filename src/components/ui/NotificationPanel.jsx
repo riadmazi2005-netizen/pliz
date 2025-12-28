@@ -13,12 +13,12 @@ export default function NotificationPanel({
   const [filter, setFilter] = useState('all'); // all, unread, read
 
   const filteredNotifications = notifications.filter(notif => {
-    if (filter === 'unread') return notif.statut === 'Non lue';
-    if (filter === 'read') return notif.statut === 'Lue';
+    if (filter === 'unread') return !notif.lue;
+    if (filter === 'read') return notif.lue === true;
     return true;
   });
 
-  const unreadCount = notifications.filter(n => n.statut === 'Non lue').length;
+  const unreadCount = notifications.filter(n => !n.lue).length;
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -146,7 +146,7 @@ export default function NotificationPanel({
                     transition={{ delay: index * 0.05 }}
                     className={`relative border-l-4 rounded-xl p-4 transition-all ${
                       getNotificationColor(notif.titre)
-                    } ${notif.statut === 'Non lue' ? 'shadow-md' : 'opacity-75'}`}
+                    } ${!notif.lue ? 'shadow-md' : 'opacity-75'}`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-1">
@@ -158,7 +158,7 @@ export default function NotificationPanel({
                           <h4 className="font-semibold text-gray-800 text-sm">
                             {notif.titre}
                           </h4>
-                          {notif.statut === 'Non lue' && (
+                          {!notif.lue && (
                             <div className="w-2 h-2 bg-amber-500 rounded-full flex-shrink-0 mt-1" />
                           )}
                         </div>
@@ -169,13 +169,13 @@ export default function NotificationPanel({
                         
                         <div className="flex items-center justify-between mt-3">
                           <p className="text-xs text-gray-400">
-                            {formatDate(notif.date_creation)}
+                            {formatDate(notif.date || notif.date_creation)}
                           </p>
                           
                           <div className="flex gap-2">
-                            {notif.statut === 'Non lue' && (
+                            {!notif.lue && (
                               <button
-                                onClick={() => onMarkAsRead(notif.id)}
+                                onClick={() => onMarkAsRead && onMarkAsRead(notif.id)}
                                 className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
                               >
                                 <CheckCircle className="w-3 h-3" />
@@ -183,13 +183,15 @@ export default function NotificationPanel({
                               </button>
                             )}
                             
-                            <button
-                              onClick={() => onDelete(notif.id)}
-                              className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Supprimer
-                            </button>
+                            {onDelete && (
+                              <button
+                                onClick={() => onDelete(notif.id)}
+                                className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Supprimer
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -206,13 +208,13 @@ export default function NotificationPanel({
               <p className="text-sm text-gray-500">
                 {filteredNotifications.length} notification(s)
               </p>
-              {unreadCount > 0 && (
+              {unreadCount > 0 && onMarkAsRead && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     filteredNotifications
-                      .filter(n => n.statut === 'Non lue')
+                      .filter(n => !n.lue)
                       .forEach(n => onMarkAsRead(n.id));
                   }}
                   className="text-amber-600 hover:text-amber-700"

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { elevesAPI, notificationsAPI, presencesAPI } from '../services/apiService';
+import { elevesAPI, notificationsAPI, presencesAPI, demandesAPI } from '../services/apiService';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { 
   Users, Bell, UserPlus, Edit, LogOut, GraduationCap, 
-  Bus, CreditCard, Clock, CheckCircle, AlertCircle, Eye, XCircle
+  Bus, CreditCard, Clock, CheckCircle, AlertCircle, Eye, XCircle,
+  TrendingUp, MapPin, Calendar
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import NotificationPanel from '../components/ui/NotificationPanel';
 import StatCard from '../components/ui/StatCard';
 
@@ -20,6 +24,7 @@ export default function TuteurDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [inscriptionFilter, setInscriptionFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('eleves');
 
   useEffect(() => {
     const session = localStorage.getItem('tuteur_session');
@@ -36,14 +41,16 @@ export default function TuteurDashboard() {
   const loadData = async (tuteurId) => {
     try {
       // Charger les élèves du tuteur
-      const allEleves = await elevesAPI.getAll();
+      const allElevesResponse = await elevesAPI.getAll();
+      const allEleves = allElevesResponse?.data || allElevesResponse || [];
       const elevesData = allEleves.filter(e => e.tuteur_id === tuteurId);
       
       // Charger les notifications
-      const notificationsData = await notificationsAPI.getByUser(tuteurId, 'tuteur');
+      const notificationsResponse = await notificationsAPI.getByUser(tuteurId, 'tuteur');
+      const notificationsData = notificationsResponse?.data || notificationsResponse || [];
       
       setEleves(elevesData);
-      setNotifications(notificationsData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      setNotifications(notificationsData.sort((a, b) => new Date(b.date || b.date_creation || 0) - new Date(a.date || a.date_creation || 0)));
     } catch (err) {
       console.error('Erreur lors du chargement:', err);
     }
@@ -212,7 +219,8 @@ export default function TuteurDashboard() {
           </Link>
         </motion.div>
 
-        {/* Liste des élèves */}
+        {/* Content */}
+        {activeTab === 'eleves' && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -308,6 +316,11 @@ export default function TuteurDashboard() {
             </div>
           )}
         </motion.div>
+        )}
+
+        {activeTab === 'demandes' && (
+          <DemandeFormTuteur tuteur={tuteur} eleves={eleves} />
+        )}
       </div>
 
       <NotificationPanel
@@ -315,7 +328,196 @@ export default function TuteurDashboard() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAsRead={markNotificationAsRead}
+        onDelete={async (notifId) => {
+          try {
+            await notificationsAPI.delete(notifId);
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+          } catch (err) {
+            console.error('Erreur lors de la suppression de la notification:', err);
+          }
+        }}
       />
     </div>
+  );
+}
+
+function DemandeFormTuteur({ tuteur, eleves }) {
+  const zones = ['agdal', '(takaddoum-haynahda)', 'hay riad', 'temara', 'medina', 'hay el fath', 'hay lmohit', 'yaakoub al mansour'];
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [formData, setFormData] = useState({
+    eleve_id: '',
+    nouvelle_adresse: '',
+    nouvelle_zone: '',
+    date_demenagement: '',
+    raisons: ''
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      await demandesAPI.create({
+        eleve_id: parseInt(formData.eleve_id),
+        tuteur_id: tuteur.id,
+        type_demande: 'Déménagement',
+        nouvelle_adresse: formData.nouvelle_adresse,
+        nouvelle_zone: formData.nouvelle_zone,
+        date_demenagement: formData.date_demenagement,
+        raisons: formData.raisons,
+        statut: 'En attente'
+      });
+      
+      // Notifier l'admin
+      await notificationsAPI.create({
+        destinataire_id: 1, // ID admin par défaut
+        destinataire_type: 'admin',
+        titre: 'Nouvelle demande de changement d\'adresse/zone',
+        message: `${tuteur.prenom} ${tuteur.nom} a fait une demande de changement d'adresse/zone pour un élève.`,
+        type: 'info'
+      });
+      
+      setSuccess(true);
+      setFormData({
+        eleve_id: '',
+        nouvelle_adresse: '',
+        nouvelle_zone: '',
+        date_demenagement: '',
+        raisons: ''
+      });
+      
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi de la demande:', err);
+      alert('Erreur lors de l\'envoi de la demande');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedEleve = eleves.find(e => e.id === parseInt(formData.eleve_id));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-3xl shadow-xl p-6"
+    >
+      <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+        <TrendingUp className="w-6 h-6 text-amber-500" />
+        Demande de changement d'adresse / Zone (Déménagement)
+      </h2>
+
+      {success && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-700"
+        >
+          <CheckCircle className="w-5 h-5" />
+          Demande envoyée avec succès !
+        </motion.div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <Label className="text-gray-700 font-medium mb-2">Sélectionner l'élève</Label>
+          <Select
+            value={formData.eleve_id}
+            onValueChange={(v) => setFormData({ ...formData, eleve_id: v })}
+          >
+            <SelectTrigger className="mt-1 h-12 rounded-xl">
+              <SelectValue placeholder="Sélectionnez un élève" />
+            </SelectTrigger>
+            <SelectContent>
+              {eleves.map(eleve => (
+                <SelectItem key={eleve.id} value={eleve.id.toString()}>
+                  {eleve.prenom} {eleve.nom} - {eleve.classe}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedEleve && (
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+            <p className="text-sm text-gray-600 mb-2">Informations actuelles</p>
+            <p className="font-medium">Adresse actuelle: <span className="text-gray-700">{selectedEleve.adresse || 'Non renseignée'}</span></p>
+          </div>
+        )}
+
+        <div>
+          <Label className="text-gray-700 font-medium mb-2 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-amber-500" />
+            Nouvelle adresse
+          </Label>
+          <Input
+            value={formData.nouvelle_adresse}
+            onChange={(e) => setFormData({ ...formData, nouvelle_adresse: e.target.value })}
+            className="mt-1 h-12 rounded-xl"
+            placeholder="Nouvelle adresse complète"
+            required
+          />
+        </div>
+
+        <div>
+          <Label className="text-gray-700 font-medium mb-2 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-amber-500" />
+            Nouvelle zone
+          </Label>
+          <Select
+            value={formData.nouvelle_zone}
+            onValueChange={(v) => setFormData({ ...formData, nouvelle_zone: v })}
+          >
+            <SelectTrigger className="mt-1 h-12 rounded-xl">
+              <SelectValue placeholder="Sélectionnez la nouvelle zone" />
+            </SelectTrigger>
+            <SelectContent>
+              {zones.map(zone => (
+                <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="text-gray-700 font-medium mb-2 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-amber-500" />
+            Date de déménagement
+          </Label>
+          <Input
+            type="date"
+            value={formData.date_demenagement}
+            onChange={(e) => setFormData({ ...formData, date_demenagement: e.target.value })}
+            className="mt-1 h-12 rounded-xl"
+            required
+          />
+        </div>
+
+        <div>
+          <Label className="text-gray-700 font-medium mb-2">Raisons / Justification</Label>
+          <Textarea
+            value={formData.raisons}
+            onChange={(e) => setFormData({ ...formData, raisons: e.target.value })}
+            className="mt-1 rounded-xl min-h-[120px]"
+            placeholder="Expliquez les raisons du déménagement..."
+            required
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading || !formData.eleve_id}
+          className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl"
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            'Envoyer la demande'
+          )}
+        </Button>
+      </form>
+    </motion.div>
   );
 }

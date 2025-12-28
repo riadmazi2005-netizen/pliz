@@ -46,8 +46,8 @@ export default function TuteurRegister() {
     setLoading(true);
     
     try {
-      // Prepare data for registration
-      const { confirm_password, ...userData } = formData;
+      // Prepare data for registration - remove confirm_password and adresse (not in DB)
+      const { confirm_password, adresse, ...userData } = formData;
       userData.role = 'tuteur'; // Add role for backend
       
       // Call register API
@@ -63,8 +63,11 @@ export default function TuteurRegister() {
       console.error('Erreur lors de l\'inscription:', err);
       
       // Handle different error types
-      if (err.message && err.message.includes('email')) {
+      const errorMessage = err.message || '';
+      if (errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('déjà')) {
         setError('Un compte existe déjà avec cet email');
+      } else if (errorMessage) {
+        setError(errorMessage);
       } else {
         setError('Erreur lors de la création du compte. Veuillez réessayer.');
       }

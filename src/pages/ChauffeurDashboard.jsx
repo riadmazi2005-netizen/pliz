@@ -108,8 +108,9 @@ export default function ChauffeurDashboard() {
       
       // Charger les notifications
       try {
-        const notificationsData = await notificationsAPI.getByUser(chauffeurData.id, 'chauffeur');
-        setNotifications(notificationsData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+        const notificationsResponse = await notificationsAPI.getByUser(chauffeurData.id, 'chauffeur');
+        const notificationsData = notificationsResponse?.data || notificationsResponse || [];
+        setNotifications(notificationsData.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
       } catch (err) {
         console.error('Erreur chargement notifications:', err);
       }
@@ -529,6 +530,14 @@ export default function ChauffeurDashboard() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAsRead={markNotificationAsRead}
+        onDelete={async (notifId) => {
+          try {
+            await notificationsAPI.delete(notifId);
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+          } catch (err) {
+            console.error('Erreur lors de la suppression de la notification:', err);
+          }
+        }}
       />
     </div>
   );

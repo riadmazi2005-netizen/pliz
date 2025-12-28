@@ -1,71 +1,54 @@
 <?php
+require_once '../../config/headers.php';
 require_once '../../config/database.php';
-
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
     exit;
 }
 
 $data = json_decode(file_get_contents('php://input'), true);
 
-$required_fields = ['numero', 'marque', 'modele', 'capacite'];
-foreach ($required_fields as $field) {
-    if (!isset($data[$field]) || empty(trim($data[$field]))) {
-        http_response_code(400);
-        echo json_encode(['error' => "Field '$field' is required"]);
-        exit;
-    }
-}
-
 try {
-    $db = Database::getInstance()->getConnection();
-
-    // Check if bus numero already exists
-    $stmt = $db->prepare("SELECT id FROM bus WHERE numero = ?");
-    $stmt->execute([$data['numero']]);
-    if ($stmt->fetch()) {
-        http_response_code(409);
-        echo json_encode(['error' => 'Bus number already exists']);
-        exit;
-    }
-
-    $stmt = $db->prepare("
-        INSERT INTO bus (numero, marque, modele, annee_fabrication, capacite, chauffeur_id, responsable_id, statut)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Actif')
-    ");
+    $pdo = getDBConnection();
+    $stmt = $pdo->prepare('
+        INSERT INTO bus (numero, marque, modele, annee_fabrication, capacite, chauffeur_id, responsable_id, trajet_id, statut)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ');
+    
     $stmt->execute([
-        trim($data['numero']),
-        trim($data['marque']),
-        trim($data['modele']),
+        $data['numero'],
+        $data['marque'] ?? null,
+        $data['modele'] ?? null,
         $data['annee_fabrication'] ?? null,
         $data['capacite'],
         $data['chauffeur_id'] ?? null,
-        $data['responsable_id'] ?? null
+        $data['responsable_id'] ?? null,
+        $data['trajet_id'] ?? null,
+        $data['statut'] ?? 'Actif'
     ]);
-
+    
+    $id = $pdo->lastInsertId();
+    $stmt = $pdo->prepare('SELECT * FROM bus WHERE id = ?');
+    $stmt->execute([$id]);
+    $bus = $stmt->fetch();
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Bus created successfully',
-        'data' => [
-            'id' => $db->lastInsertId(),
-            'numero' => $data['numero'],
-            'marque' => $data['marque'],
-            'modele' => $data['modele']
-        ]
+        'data' => $bus
     ]);
-
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erreur lors de la création']);
 }
 ?>
+
+
+
+
+
+
+
+
+

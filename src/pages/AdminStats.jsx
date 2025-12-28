@@ -72,7 +72,7 @@ export default function AdminStats() {
 
   const loadData = async () => {
     try {
-      const [eleves, paiements, accidents, buses, inscriptions] = await Promise.all([
+      const [elevesRes, paiementsRes, accidentsRes, busesRes, inscriptionsRes] = await Promise.all([
         elevesAPI.getAll(),
         paiementsAPI.getAll(),
         accidentsAPI.getAll(),
@@ -80,11 +80,19 @@ export default function AdminStats() {
         inscriptionsAPI.getAll()
       ]);
       
+      // Extraire les données avec gestion de différents formats de réponse
+      const eleves = elevesRes?.data || elevesRes || [];
+      const paiements = paiementsRes?.data || paiementsRes || [];
+      const accidents = accidentsRes?.data || accidentsRes || [];
+      const buses = busesRes?.data || busesRes || [];
+      const inscriptions = inscriptionsRes?.data || inscriptionsRes || [];
+      
       // Note: presencesAPI n'est pas dans le SQL d'origine, 
       // vous devrez peut-être créer une table presences ou utiliser une autre logique
       let presences = [];
       try {
-        presences = await presencesAPI.getByDate(new Date().toISOString().split('T')[0]);
+        const presencesRes = await presencesAPI.getByDate(new Date().toISOString().split('T')[0]);
+        presences = presencesRes?.data || presencesRes || [];
       } catch (err) {
         console.warn('Présences non disponibles:', err);
       }

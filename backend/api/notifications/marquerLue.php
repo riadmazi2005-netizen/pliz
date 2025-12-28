@@ -1,18 +1,10 @@
 <?php
+require_once '../../config/headers.php';
 require_once '../../config/database.php';
-
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: PUT, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
     exit;
 }
 
@@ -20,35 +12,28 @@ $data = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($data['id'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Notification ID is required']);
+    echo json_encode(['success' => false, 'message' => 'ID requis']);
     exit;
 }
 
-$id = $data['id'];
-
 try {
-    $db = Database::getInstance()->getConnection();
-
-    // Check if notification exists
-    $stmt = $db->prepare("SELECT id FROM notifications WHERE id = ?");
-    $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Notification not found']);
-        exit;
-    }
-
-    // Mark as read
-    $stmt = $db->prepare("UPDATE notifications SET statut = 'Lue' WHERE id = ?");
-    $stmt->execute([$id]);
-
+    $pdo = getDBConnection();
+    $stmt = $pdo->prepare('UPDATE notifications SET lue = TRUE WHERE id = ?');
+    $stmt->execute([$data['id']]);
+    
+    // Récupérer la notification mise à jour
+    $stmt = $pdo->prepare('SELECT * FROM notifications WHERE id = ?');
+    $stmt->execute([$data['id']]);
+    $notification = $stmt->fetch(PDO::FETCH_ASSOC);
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Notification marked as read'
+        'data' => $notification,
+        'message' => 'Notification marquée comme lue'
     ]);
-
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erreur lors de la mise à jour: ' . $e->getMessage()]);
 }
 ?>
+

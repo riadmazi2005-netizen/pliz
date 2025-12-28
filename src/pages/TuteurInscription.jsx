@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { elevesAPI, notificationsAPI, demandesAPI } from '../services/apiService';
+
+// Helper function to get admins
+const getAdmins = async () => {
+  const response = await fetch('http://localhost/backend/api/utilisateurs/getAdmins.php');
+  if (response.ok) {
+    return await response.json();
+  }
+  return { success: false, data: [] };
+};
 import { motion } from 'framer-motion';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,15 +36,17 @@ export default function TuteurInscription() {
     classe: '',
     niveau: '',
     zone: '',
+    adresse: '',
     lien_parente: '',
+    lien_parente_custom: '', // Pour valeur personnalisée
     // Infos inscription
     type_transport: '',
     abonnement: '',
     groupe: ''
   });
 
-  const zones = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4', 'Zone 5'];
-  const classes = ['CP', 'CE1', 'CE2', 'CM1', 'CM2', '6ème', '5ème', '4ème', '3ème', '2nde', '1ère', 'Terminale'];
+  const zones = ['agdal', '(takaddoum-haynahda)', 'hay riad', 'temara', 'medina', 'hay el fath', 'hay lmohit', 'yaakoub al mansour'];
+  const classes = ['1AP', '2AP', '3AP', '4AP', '5AP', '6AP', '1AC', '2AC', '3AC', 'TC', '1BAC', '2BAC'];
 
   useEffect(() => {
     const session = localStorage.getItem('tuteur_session');
@@ -61,7 +72,7 @@ export default function TuteurInscription() {
         nom: formData.nom,
         prenom: formData.prenom,
         date_naissance: formData.date_naissance,
-        adresse: '', // Can be added to form if needed
+        adresse: formData.adresse,
         telephone_parent: tuteur.telephone,
         email_parent: tuteur.email,
         classe: formData.classe,
@@ -70,10 +81,21 @@ export default function TuteurInscription() {
       };
       
       // Create eleve
-      const newEleve = await elevesAPI.create(eleveData);
+      const eleveResponse = await elevesAPI.create(eleveData);
+      
+      if (!eleveResponse.success || !eleveResponse.data) {
+        throw new Error('Erreur lors de la création de l\'élève');
+      }
+      
+      const newEleve = eleveResponse.data;
+      
+      // Préparer le lien de parenté (valeur sélectionnée ou personnalisée)
+      const lienParenteFinal = formData.lien_parente === 'Autre' 
+        ? formData.lien_parente_custom.trim() 
+        : formData.lien_parente;
       
       // Create demande (inscription request)
-      await demandesAPI.create({
+      const demandeResponse = await demandesAPI.create({
         eleve_id: newEleve.id,
         tuteur_id: tuteur.id,
         type_demande: 'inscription',
@@ -83,10 +105,14 @@ export default function TuteurInscription() {
           groupe: formData.groupe,
           zone: formData.zone,
           niveau: formData.niveau,
-          lien_parente: formData.lien_parente
+          lien_parente: lienParenteFinal
         }),
         statut: 'En attente'
       });
+      
+      if (!demandeResponse.success) {
+        throw new Error('Erreur lors de la création de la demande');
+      }
       
       // Create notification for tuteur
       await notificationsAPI.create({
@@ -97,14 +123,26 @@ export default function TuteurInscription() {
         type: 'info'
       });
       
-      // Create notification for admin
-      await notificationsAPI.create({
-        destinataire_id: 1, // Admin ID - adjust as needed
-        destinataire_type: 'admin',
-        titre: 'Nouvelle demande d\'inscription',
-        message: `Nouvelle demande d'inscription pour ${formData.prenom} ${formData.nom} de ${tuteur.prenom} ${tuteur.nom}`,
-        type: 'info'
-      });
+      // Récupérer tous les admins pour leur envoyer une notification
+      try {
+        const adminsData = await getAdmins();
+        if (adminsData.success && adminsData.data && adminsData.data.length > 0) {
+          // Envoyer notification à tous les admins
+          const notificationPromises = adminsData.data.map(admin => 
+            notificationsAPI.create({
+              destinataire_id: admin.id,
+              destinataire_type: 'admin',
+              titre: 'Nouvelle demande d\'inscription',
+              message: `Nouvelle demande d'inscription pour ${formData.prenom} ${formData.nom} de ${tuteur.prenom} ${tuteur.nom}`,
+              type: 'info'
+            })
+          );
+          await Promise.all(notificationPromises);
+        }
+      } catch (adminError) {
+        // Si l'endpoint n'existe pas, on continue sans notification admin
+        console.warn('Impossible de récupérer les admins pour la notification:', adminError);
+      }
       
       navigate(createPageUrl('TuteurDashboard'));
     } catch (err) {
@@ -236,7 +274,13 @@ export default function TuteurInscription() {
                   <Label className="text-gray-700 font-medium">Lien de parenté avec l'élève</Label>
                   <Select 
                     value={formData.lien_parente} 
-                    onValueChange={(v) => handleChange('lien_parente', v)}
+                    onValueChange={(v) => {
+                      handleChange('lien_parente', v);
+                      // Réinitialiser la valeur personnalisée si on change d'option
+                      if (v !== 'Autre') {
+                        handleChange('lien_parente_custom', '');
+                      }
+                    }}
                   >
                     <SelectTrigger className="mt-1 h-12 rounded-xl">
                       <SelectValue placeholder="Sélectionnez le lien" />
@@ -245,15 +289,32 @@ export default function TuteurInscription() {
                       <SelectItem value="Père">Père</SelectItem>
                       <SelectItem value="Mère">Mère</SelectItem>
                       <SelectItem value="Tuteur légal">Tuteur légal</SelectItem>
-                      <SelectItem value="Autre">Autre</SelectItem>
+                      <SelectItem value="Grand-père">Grand-père</SelectItem>
+                      <SelectItem value="Grand-mère">Grand-mère</SelectItem>
+                      <SelectItem value="Oncle">Oncle</SelectItem>
+                      <SelectItem value="Tante">Tante</SelectItem>
+                      <SelectItem value="Frère">Frère</SelectItem>
+                      <SelectItem value="Sœur">Sœur</SelectItem>
+                      <SelectItem value="Autre">Autre (précisez)</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  {formData.lien_parente === 'Autre' && (
+                    <Input
+                      type="text"
+                      placeholder="Précisez le lien de parenté (ex: cousin, beau-père, etc.)"
+                      value={formData.lien_parente_custom}
+                      onChange={(e) => handleChange('lien_parente_custom', e.target.value)}
+                      className="mt-2 h-12 rounded-xl"
+                      required
+                    />
+                  )}
                 </div>
 
                 <Button
                   type="button"
                   onClick={() => setCurrentStep(2)}
-                  disabled={!formData.lien_parente}
+                  disabled={!formData.lien_parente || (formData.lien_parente === 'Autre' && !formData.lien_parente_custom.trim())}
                   className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl"
                 >
                   Continuer
@@ -359,6 +420,20 @@ export default function TuteurInscription() {
                 <div>
                   <Label className="text-gray-700 font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-amber-500" />
+                    Adresse
+                  </Label>
+                  <Input
+                    value={formData.adresse}
+                    onChange={(e) => handleChange('adresse', e.target.value)}
+                    className="mt-1 h-12 rounded-xl"
+                    placeholder="Adresse complète"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-700 font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-amber-500" />
                     Zone géographique
                   </Label>
                   <Select 
@@ -388,7 +463,7 @@ export default function TuteurInscription() {
                   <Button
                     type="button"
                     onClick={() => setCurrentStep(3)}
-                    disabled={!formData.nom || !formData.prenom || !formData.classe || !formData.zone}
+                    disabled={!formData.nom || !formData.prenom || !formData.classe || !formData.zone || !formData.adresse}
                     className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl"
                   >
                     Continuer

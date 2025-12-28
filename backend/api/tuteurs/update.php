@@ -1,18 +1,10 @@
 <?php
+require_once '../../config/headers.php';
 require_once '../../config/database.php';
-
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: PUT, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
     exit;
 }
 
@@ -20,70 +12,74 @@ $data = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($data['id'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Tuteur ID is required']);
+    echo json_encode(['success' => false, 'message' => 'ID requis']);
     exit;
 }
 
-$id = $data['id'];
-
 try {
-    $db = Database::getInstance()->getConnection();
-
-    // Check if tuteur exists
-    $stmt = $db->prepare("SELECT id FROM utilisateurs WHERE id = ? AND role = 'tuteur'");
+    $pdo = getDBConnection();
+    $id = $data['id'];
+    
+    // Vérifier que l'utilisateur existe et est un tuteur
+    $stmt = $pdo->prepare('SELECT id, role FROM utilisateurs WHERE id = ?');
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user) {
         http_response_code(404);
-        echo json_encode(['error' => 'Tuteur not found']);
+        echo json_encode(['success' => false, 'message' => 'Tuteur non trouvé']);
         exit;
     }
-
-    // Update user information
-    $update_fields = [];
-    $update_values = [];
-
-    if (isset($data['nom'])) {
-        $update_fields[] = "nom = ?";
-        $update_values[] = trim($data['nom']);
+    
+    if ($user['role'] !== 'tuteur') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Cet utilisateur n\'est pas un tuteur']);
+        exit;
     }
-    if (isset($data['prenom'])) {
-        $update_fields[] = "prenom = ?";
-        $update_values[] = trim($data['prenom']);
-    }
-    if (isset($data['email'])) {
-        // Check if email is already taken by another user
-        $stmt = $db->prepare("SELECT id FROM utilisateurs WHERE email = ? AND id != ?");
-        $stmt->execute([$data['email'], $id]);
-        if ($stmt->fetch()) {
-            http_response_code(409);
-            echo json_encode(['error' => 'Email already exists']);
-            exit;
+    
+    // Préparer les données pour la mise à jour (exclure id et mot_de_passe)
+    unset($data['id']);
+    unset($data['mot_de_passe']);
+    unset($data['role']); // Ne pas permettre le changement de rôle via cette API
+    
+    $fields = [];
+    $values = [];
+    
+    // Champs autorisés pour la mise à jour
+    // Note: adresse n'existe pas dans la table utilisateurs, donc on ne l'inclut pas
+    $allowedFields = ['nom', 'prenom', 'email', 'telephone'];
+    
+    foreach ($data as $key => $value) {
+        if (in_array($key, $allowedFields)) {
+            $fields[] = "$key = ?";
+            $values[] = $value;
         }
-        $update_fields[] = "email = ?";
-        $update_values[] = trim($data['email']);
     }
-    if (isset($data['telephone'])) {
-        $update_fields[] = "telephone = ?";
-        $update_values[] = trim($data['telephone']);
+    
+    if (empty($fields)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Aucune donnée à mettre à jour']);
+        exit;
     }
-    if (isset($data['statut'])) {
-        $update_fields[] = "statut = ?";
-        $update_values[] = $data['statut'];
-    }
-
-    if (!empty($update_fields)) {
-        $update_values[] = $id;
-        $stmt = $db->prepare("UPDATE utilisateurs SET " . implode(', ', $update_fields) . " WHERE id = ?");
-        $stmt->execute($update_values);
-    }
-
+    
+    $values[] = $id;
+    
+    $sql = "UPDATE utilisateurs SET " . implode(', ', $fields) . " WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($values);
+    
+    // Récupérer l'utilisateur mis à jour (sans le mot de passe)
+    $stmt = $pdo->prepare('SELECT id, nom, prenom, email, telephone, role, statut, date_creation, date_modification FROM utilisateurs WHERE id = ?');
+    $stmt->execute([$id]);
+    $updatedUser = $stmt->fetch(PDO::FETCH_ASSOC);
+    
     echo json_encode([
         'success' => true,
-        'message' => 'Tuteur updated successfully'
+        'data' => $updatedUser
     ]);
-
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erreur lors de la mise à jour']);
 }
 ?>
+

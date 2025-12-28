@@ -81,8 +81,9 @@ export default function ResponsableDashboard() {
       }
       
       // Charger les notifications
-      const notificationsData = await notificationsAPI.getByUser(responsableData.id, 'responsable');
-      setNotifications(notificationsData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      const notificationsResponse = await notificationsAPI.getByUser(responsableData.id, 'responsable');
+      const notificationsData = notificationsResponse?.data || notificationsResponse || [];
+      setNotifications(notificationsData.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
     } catch (err) {
       console.error('Erreur lors du chargement:', err);
     }
@@ -422,17 +423,17 @@ export default function ResponsableDashboard() {
               try {
                 await demandesAPI.create(demande);
                 
-                // Notifier tous les admins (vous devrez créer un endpoint pour récupérer les admins)
+                // Notifier tous les admins
                 await notificationsAPI.create({
-                  destinataire_id: 1, // ID admin par défaut, à adapter
+                  destinataire_id: 1, // ID admin par défaut
                   destinataire_type: 'admin',
                   titre: `Nouvelle demande de ${demande.type_demande}`,
-                  message: `${responsable.prenom} ${responsable.nom} a fait une demande de ${demande.type_demande.toLowerCase()}.`,
-                  type: 'info',
-                  date: new Date().toISOString()
+                  message: `${responsable.prenom} ${responsable.nom} (Responsable Bus) a fait une demande de ${demande.type_demande.toLowerCase()}.`,
+                  type: 'info'
                 });
               } catch (err) {
                 console.error('Erreur lors de la création de la demande:', err);
+                alert('Erreur lors de l\'envoi de la demande');
               }
             }}
           />
@@ -444,6 +445,14 @@ export default function ResponsableDashboard() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAsRead={markNotificationAsRead}
+        onDelete={async (notifId) => {
+          try {
+            await notificationsAPI.delete(notifId);
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+          } catch (err) {
+            console.error('Erreur lors de la suppression de la notification:', err);
+          }
+        }}
       />
     </div>
   );
@@ -453,8 +462,11 @@ function DemandeForm({ demandeur, demandeurType, onSubmit }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
-    type_demande: 'inscription',
-    description: ''
+    type_demande: '',
+    raisons: '',
+    salaire_demande: '',
+    date_debut_conge: '',
+    date_fin_conge: ''
   });
 
   const handleSubmit = async (e) => {
@@ -463,16 +475,24 @@ function DemandeForm({ demandeur, demandeurType, onSubmit }) {
     
     try {
       await onSubmit({
-        tuteur_id: demandeur.id, // Adapter selon votre structure
+        demandeur_id: demandeur.id,
+        demandeur_type: demandeurType,
         type_demande: formData.type_demande,
-        description: formData.description,
+        raisons: formData.raisons,
+        salaire_demande: formData.type_demande === 'Augmentation' ? parseInt(formData.salaire_demande) : null,
+        salaire_actuel: demandeur.salaire || null,
+        date_debut_conge: formData.type_demande === 'Congé' ? formData.date_debut_conge : null,
+        date_fin_conge: formData.type_demande === 'Congé' ? formData.date_fin_conge : null,
         statut: 'En attente'
       });
       
       setSuccess(true);
       setFormData({
-        type_demande: 'inscription',
-        description: ''
+        type_demande: '',
+        raisons: '',
+        salaire_demande: '',
+        date_debut_conge: '',
+        date_fin_conge: ''
       });
       
       setTimeout(() => setSuccess(false), 3000);
@@ -510,26 +530,71 @@ function DemandeForm({ demandeur, demandeurType, onSubmit }) {
             className="w-full h-12 rounded-xl border border-gray-200 px-4"
             required
           >
-            <option value="inscription">Demande d'inscription</option>
-            <option value="modification">Demande de modification</option>
-            <option value="desinscription">Demande de désinscription</option>
+            <option value="">Sélectionnez</option>
+            <option value="Augmentation">Demande d'augmentation</option>
+            <option value="Congé">Demande de congé</option>
+            <option value="Autre">Autre demande</option>
           </select>
         </div>
 
+        {formData.type_demande === 'Augmentation' && demandeur.salaire && (
+          <>
+            <div className="bg-amber-50 rounded-xl p-4">
+              <p className="text-sm text-gray-600">Salaire actuel</p>
+              <p className="text-2xl font-bold text-amber-600">{demandeur.salaire} DH</p>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium mb-2">Salaire demandé (DH)</label>
+              <input
+                type="number"
+                value={formData.salaire_demande}
+                onChange={(e) => setFormData({ ...formData, salaire_demande: e.target.value })}
+                className="w-full h-12 rounded-xl border border-gray-200 px-4"
+                required
+              />
+            </div>
+          </>
+        )}
+
+        {formData.type_demande === 'Congé' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 font-medium mb-2">Date début</label>
+              <input
+                type="date"
+                value={formData.date_debut_conge}
+                onChange={(e) => setFormData({ ...formData, date_debut_conge: e.target.value })}
+                className="w-full h-12 rounded-xl border border-gray-200 px-4"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium mb-2">Date fin</label>
+              <input
+                type="date"
+                value={formData.date_fin_conge}
+                onChange={(e) => setFormData({ ...formData, date_fin_conge: e.target.value })}
+                className="w-full h-12 rounded-xl border border-gray-200 px-4"
+                required
+              />
+            </div>
+          </div>
+        )}
+
         <div>
-          <label className="block text-gray-700 font-medium mb-2">Description</label>
+          <label className="block text-gray-700 font-medium mb-2">Justification / Raisons</label>
           <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            value={formData.raisons}
+            onChange={(e) => setFormData({ ...formData, raisons: e.target.value })}
             className="w-full rounded-xl border border-gray-200 p-4 min-h-[120px]"
-            placeholder="Décrivez votre demande..."
+            placeholder="Expliquez les raisons de votre demande..."
             required
           />
         </div>
 
         <Button
           type="submit"
-          disabled={loading}
+          disabled={loading || !formData.type_demande}
           className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl"
         >
           {loading ? (

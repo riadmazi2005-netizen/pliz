@@ -16,6 +16,19 @@ const Select = ({ children, value, onValueChange, ...props }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Extract SelectItems from SelectContent for displaying selected value
+  let selectItems = [];
+  React.Children.forEach(children, child => {
+    if (child && child.type === SelectContent) {
+      const contentChildren = React.Children.toArray(child.props.children);
+      contentChildren.forEach(item => {
+        if (item && item.type === SelectItem) {
+          selectItems.push(item);
+        }
+      });
+    }
+  });
+
   return (
     <div ref={selectRef} className="relative" {...props}>
       {React.Children.map(children, child => {
@@ -23,7 +36,8 @@ const Select = ({ children, value, onValueChange, ...props }) => {
           return React.cloneElement(child, { 
             isOpen, 
             onClick: () => setIsOpen(!isOpen),
-            value
+            value,
+            selectItems
           });
         }
         if (child.type === SelectContent) {
@@ -42,7 +56,7 @@ const Select = ({ children, value, onValueChange, ...props }) => {
   );
 };
 
-const SelectTrigger = ({ className = '', children, isOpen, onClick, ...props }) => {
+const SelectTrigger = ({ className = '', children, isOpen, onClick, value, selectItems = [], ...props }) => {
   return (
     <button
       type="button"
@@ -50,14 +64,32 @@ const SelectTrigger = ({ className = '', children, isOpen, onClick, ...props }) 
       className={`flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all ${className}`}
       {...props}
     >
-      {children}
+      {React.Children.map(children, child => {
+        if (child.type === SelectValue) {
+          return React.cloneElement(child, { value, selectItems });
+        }
+        return child;
+      })}
       <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
     </button>
   );
 };
 
-const SelectValue = ({ placeholder, children }) => {
-  return <span className="text-gray-900">{children || placeholder}</span>;
+const SelectValue = ({ placeholder, children, value, selectItems = [] }) => {
+  // If children are provided directly, use them
+  if (children) {
+    return <span className="text-gray-900">{children}</span>;
+  }
+  
+  // Otherwise, find the matching SelectItem from selectItems
+  if (value && selectItems.length > 0) {
+    const selectedItem = selectItems.find(item => item.props.value === value);
+    if (selectedItem) {
+      return <span className="text-gray-900">{selectedItem.props.children}</span>;
+    }
+  }
+  
+  return <span className="text-gray-500">{placeholder}</span>;
 };
 
 const SelectContent = ({ children, isOpen, onSelect, value, className = '' }) => {

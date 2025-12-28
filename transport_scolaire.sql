@@ -56,6 +56,22 @@ CREATE TABLE responsables_bus (
     FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE
 );
 
+-- Table trajets
+CREATE TABLE trajets (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nom VARCHAR(255) NOT NULL,
+    zones TEXT,
+    heure_depart_matin_a TIME,
+    heure_arrivee_matin_a TIME,
+    heure_depart_soir_a TIME,
+    heure_arrivee_soir_a TIME,
+    heure_depart_matin_b TIME,
+    heure_arrivee_matin_b TIME,
+    heure_depart_soir_b TIME,
+    heure_arrivee_soir_b TIME,
+    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Table bus
 CREATE TABLE bus (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -66,10 +82,12 @@ CREATE TABLE bus (
     capacite INT NOT NULL,
     chauffeur_id INT,
     responsable_id INT,
+    trajet_id INT,
     statut ENUM('Actif', 'En maintenance', 'Hors service') DEFAULT 'Actif',
     date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chauffeur_id) REFERENCES chauffeurs(id) ON DELETE SET NULL,
-    FOREIGN KEY (responsable_id) REFERENCES responsables_bus(id) ON DELETE SET NULL
+    FOREIGN KEY (responsable_id) REFERENCES responsables_bus(id) ON DELETE SET NULL,
+    FOREIGN KEY (trajet_id) REFERENCES trajets(id) ON DELETE SET NULL
 );
 
 -- Table accidents
@@ -146,6 +164,40 @@ CREATE TABLE paiements (
     FOREIGN KEY (inscription_id) REFERENCES inscriptions(id) ON DELETE CASCADE
 );
 
+-- Table presences (pour suivre les présences et absences des élèves)
+CREATE TABLE presences (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    eleve_id INT NOT NULL,
+    date DATE NOT NULL,
+    present_matin BOOLEAN DEFAULT FALSE,
+    present_soir BOOLEAN DEFAULT FALSE,
+    bus_id INT,
+    responsable_id INT,
+    chauffeur_id INT,
+    remarque TEXT,
+    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (eleve_id) REFERENCES eleves(id) ON DELETE CASCADE,
+    FOREIGN KEY (bus_id) REFERENCES bus(id) ON DELETE SET NULL,
+    FOREIGN KEY (responsable_id) REFERENCES responsables_bus(id) ON DELETE SET NULL,
+    FOREIGN KEY (chauffeur_id) REFERENCES chauffeurs(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_presence (eleve_id, date)
+);
+
+-- Table conduire (table de liaison entre chauffeurs et trajets)
+CREATE TABLE conduire (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    chauffeur_id INT NOT NULL,
+    trajet_id INT NOT NULL,
+    bus_id INT,
+    date_debut DATE NOT NULL,
+    date_fin DATE,
+    statut ENUM('Actif', 'Terminé', 'Suspendu') DEFAULT 'Actif',
+    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chauffeur_id) REFERENCES chauffeurs(id) ON DELETE CASCADE,
+    FOREIGN KEY (trajet_id) REFERENCES trajets(id) ON DELETE CASCADE,
+    FOREIGN KEY (bus_id) REFERENCES bus(id) ON DELETE SET NULL
+);
+
 -- Insérer des données d'exemple
 INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, telephone, role, statut) VALUES
 ('Admin', 'Principal', 'admin@transport-scolaire.ma', '$2y$10$hashedpassword', '0612345678', 'admin', 'Actif'),
@@ -175,9 +227,15 @@ CREATE INDEX idx_utilisateurs_role ON utilisateurs(role);
 CREATE INDEX idx_eleves_tuteur ON eleves(tuteur_id);
 CREATE INDEX idx_bus_chauffeur ON bus(chauffeur_id);
 CREATE INDEX idx_bus_responsable ON bus(responsable_id);
+CREATE INDEX idx_bus_trajet ON bus(trajet_id);
 CREATE INDEX idx_accidents_bus ON accidents(bus_id);
 CREATE INDEX idx_accidents_chauffeur ON accidents(chauffeur_id);
 CREATE INDEX idx_notifications_destinataire ON notifications(destinataire_id, destinataire_type);
 CREATE INDEX idx_demandes_statut ON demandes(statut);
 CREATE INDEX idx_inscriptions_bus ON inscriptions(bus_id);
 CREATE INDEX idx_paiements_inscription ON paiements(inscription_id);
+CREATE INDEX idx_presences_eleve ON presences(eleve_id);
+CREATE INDEX idx_presences_date ON presences(date);
+CREATE INDEX idx_presences_bus ON presences(bus_id);
+CREATE INDEX idx_conduire_chauffeur ON conduire(chauffeur_id);
+CREATE INDEX idx_conduire_trajet ON conduire(trajet_id);
